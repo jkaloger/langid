@@ -5,8 +5,11 @@
 
 
 import json
+import collections as c
 
-
+################################################################################
+# parsing/utility functions
+################################################################################
 ''' read in json file containing data set
     returns an array of json entries
 '''
@@ -23,6 +26,9 @@ def get_langs(data):
     return [x["lang"] for x in data]
 
 
+################################################################################
+# n-gram Functions
+################################################################################
 ''' generates (word based) n-grams from string input
     where n = size of n-gram
 '''
@@ -40,46 +46,93 @@ def get_byte_ngrams(text, n):
     return grams
 
 
-''' generates a feature vector from a data set
-    used for creating a document-term matrix
-'''
-def get_feature_vector(data):
-    A = []
-    for x in range(len(data)):
-        [A.append(gram) for gram in get_word_ngrams(data[x]["text"], 2)]
-    return A
 
-
+################################################################################
+# doc-term matrix
+################################################################################
 ''' counts the number of times each n-gram appears in the document
     returns the instance representation in the document-term matrix
 '''
-def get_attributes(instance, fv):
-    A = [0]*len(fv)
-    print(len(fv))
-    for attribute in fv:
-            A[fv.index(attribute)] += 1
-    return A
+def get_feature_vector(instance):
+    return c.Counter(instance)
 
 
 ''' generates a document-term matrix from training data
 '''
 def get_document_term_matrix(training_data):
     A = []
-    fv = get_feature_vector(training_data)
-    A.append(fv)
     for instance in training_data:
-        A.append(get_attributes(instance, fv))
+        A.append(get_feature_vector(get_byte_ngrams(instance["text"],2)))
+    return A
 
 
-''' main()
+################################################################################
+# K-Nearest Neighbour Classifier
+################################################################################
+''' calculate euclidean distance between two feature vectors
 '''
-def main():
-    training_data = read_json('in/dev.json')
-    test_data = read_json('in/dev.json')
+def dist_euclid(v1, v2):
+    sum = 0
+    for f in v1 + v2:
+        sum += (v1[f] - v2[f])**2
+    return sum**1/2
+
+
+''' k-nearest-neighbour evaluation
+'''
+def knn(training_data, test_data):
     A = get_document_term_matrix(training_data)
-    print(A[0])
+    B = get_document_term_matrix(test_data)
+    predicted = []
+    real = []
+    for k,d in enumerate(B):
+        dists = []
+        for j, i in enumerate(A):
+            dists.append([dist_euclid(i, d), training_data[j]["lang"]])
+        knn = sorted(dists)
+        predicted.append(knn[0][1])
+        real.append(test_data[k]["lang"])
+        print(knn[0][1] == test_data[k]["lang"])
+    print(accuracy(predicted, real))
 
 
+################################################################################
+# Nearest Prototype Classifier
+################################################################################
+
+
+
+################################################################################
+# Naïve Bayes Classifier
+################################################################################
+
+
+################################################################################
+# Decision Tree Classifier
+################################################################################
+
+
+
+################################################################################
+# Evaluation Functions
+################################################################################
+''' accuracy eval
+'''
+def accuracy(predicted, real):
+    T = 0
+    N = 0
+    for p, r in zip(predicted, real):
+        if(p == r): # when we predicted correctly (TP OR TN)
+            T += 1
+        else: # (FP OR FN)
+            N += 1
+    return T/(T + N) # equiv to (TP+TN)/(TP+TN+FP+FN)
+
+################################################################################
+# main()
+################################################################################
 if __name__ == "__main__":
-    main()
+    training_data = read_json('in/dev.json')
+    test_data = read_json('in/test.json')
+    knn(training_data, test_data)
 
