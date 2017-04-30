@@ -99,7 +99,32 @@ def knn(training_data, test_data):
 ################################################################################
 # Nearest Prototype Classifier
 ################################################################################
+def get_prototypes(training_data, langs):
+    #doc-term matrix
+    M = get_document_term_matrix(training_data)
+    labels = [x["lang"] for x in training_data]
+    # our centroid output dict
+    centroids = dict((key,c.Counter()) for key in langs)
+    count = dict((key, 0) for key in langs)
+    # loop through all instances
+    for i, instance in enumerate(M):
+        centroids[labels[i]] += instance # add to total count
+        count[labels[i]] += 1
 
+    for l in centroids:
+        for key, val in centroids[l].items():
+            centroids[l][key] = val / count[l]
+
+    return centroids
+
+
+def nearest_prototype(prototypes, test_data):
+    T = get_document_term_matrix(test_data)
+    for k, d in enumerate(T):
+        dists = []
+        for key, value in prototypes.items():
+            dists.append([dist_euclid(value,d), key])
+        print(sorted(dists)[0][1] == test_data[k]["lang"])
 
 
 ################################################################################
@@ -133,6 +158,8 @@ def accuracy(predicted, real):
 ################################################################################
 if __name__ == "__main__":
     training_data = read_json('in/dev.json')
+    langs = ["ar", "bg", "de", "en", "es", "fa", "fr", "he", "hi", "it", "ja", "ko", "mr", "ne", "nl", "ru", "th", "uk", "ur", "zh", "unk"]
     test_data = read_json('in/test.json')
-    knn(training_data, test_data)
-
+    #knn(training_data, test_data)
+    P = get_prototypes(training_data, langs)
+    print(nearest_prototype(P, test_data))
