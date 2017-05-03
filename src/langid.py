@@ -3,6 +3,7 @@
     COMP30027 Project 2
 """
 
+
 import operator
 import json
 import numpy as np
@@ -16,9 +17,8 @@ langs = ["ar", "bg", "de", "en", "es", "fa", "fr",
 ################################################################################
 # parsing/utility functions
 ################################################################################
-''' read in json file containing data set
-    returns an array of json entries
-'''
+
+
 def read_json(filename):
     a = []
     for line in open(filename):
@@ -26,8 +26,6 @@ def read_json(filename):
     return a
 
 
-''' returns a list of languages in the data set
-'''
 def get_langs(data):
     return [x["lang"] for x in data]
 
@@ -35,18 +33,14 @@ def get_langs(data):
 ################################################################################
 # n-gram Functions
 ################################################################################
-''' generates (word based) n-grams from string input
-    where n = size of n-gram
-'''
+
+
 def get_word_ngrams(text, n):
-    A = text.split()
-    grams = [A[x:x+n] for x in range(len(A))]
+    a = text.split()
+    grams = [a[x:x+n] for x in range(len(a))]
     return grams
 
 
-''' generates (byte based) n-grams from string input
-    where n = size of n-gram
-'''
 def get_byte_ngrams(text, n):
     grams = [text[x:x+n] for x in range(len(text))]
     return grams
@@ -56,31 +50,28 @@ def get_byte_ngrams(text, n):
 ################################################################################
 # doc-term matrix
 ################################################################################
-''' counts the number of times each n-gram appears in the document
-    returns the instance representation in the document-term matrix
-'''
+
+
 def get_feature_vector(v, text):
     return v.transform([text])
 
 
-''' generates a document-term matrix from data
-'''
 def get_document_term_matrix(data):
-    v = CountVectorizer(analyzer='char')
+    v = CountVectorizer()
     corpus = [d["text"] for d in data]
-    X = v.fit_transform(corpus)
-    Y = v.build_analyzer()
-    return [v,X,Y]
+    '''" ".join(filter(lambda x: x[0] != '#', d["text"].split()))'''
+    t = v.fit_transform(corpus)
+    a = v.build_analyzer()
+    return [v, t, a]  # change to dictionary
 
 
 ################################################################################
 # Nearest Prototype Classifier
 ################################################################################
-''' evaluate nearest centroid classifier
-    returns accuracy of classifier
-'''
+
+
 def nc_eval(tl, dd, dl, v):
-    centroids = get_centroids(tl,v)
+    centroids = get_centroids(tl, v)
     labels = []
     for instance in dd:
         label = nearest_prototype(centroids, get_feature_vector(v[0], instance["text"]))
@@ -89,19 +80,13 @@ def nc_eval(tl, dd, dl, v):
     return accuracy(labels, dl)
 
 
-''' nearest prototype classifier
-    returns the language classification of instance
-'''
 def nearest_prototype(centroids, instance):
     dists = dict((key, 0) for key in langs)
     for centroid in centroids:
-        # dists[centroid] = dist_euclid(instance.toarray()[0], centroids[centroid])
         dists[centroid] = euclid_dist(instance.toarray()[0], centroids[centroid])
     return sorted(dists.items(), key=operator.itemgetter(1))[0][0]
 
 
-""" get centroids from 
-"""
 def get_centroids(tl, v):
     centroids = dict((key, 0) for key in langs)
     count = dict((key, 0) for key in langs)
@@ -121,38 +106,33 @@ def euclid_dist(a, b):
 ################################################################################
 # Naïve Bayes Classifier
 ################################################################################
-
-
 ################################################################################
 # Decision Tree Classifier
 ################################################################################
-
-
-
 ################################################################################
 # Evaluation Functions
 ################################################################################
-''' accuracy eval
-'''
+
+
 def accuracy(predicted, real):
-    T = 0
-    N = 0
+    t = 0
+    n = 0
     for p, r in zip(predicted, real):
-        if(p == r): # when we predicted correctly (TP OR TN)
-            T += 1
-        else: # (FP OR FN)
-            N += 1
-    return T/(T + N) # equiv to (TP+TN)/(TP+TN+FP+FN)
+        if p == r:  # when we predicted correctly (TP OR TN)
+            t += 1
+        else:  # (FP OR FN)
+            n += 1
+    return t/(t + n)  # equiv to (TP+TN)/(TP+TN+FP+FN)
 
 ################################################################################
 # main()
 ################################################################################
 if __name__ == "__main__":
     training_data = read_json('in/train.json')
-    training_labels = [instance["lang"] for instance in training_data]
+    training_labels = get_langs(training_data)
 
     dev_data = read_json('in/dev.json')
-    dev_labels = [instance["lang"] for instance in dev_data]
+    dev_labels = get_langs(dev_data)
 
     test_data = read_json('in/test.json')
 
