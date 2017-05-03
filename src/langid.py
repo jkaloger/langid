@@ -5,6 +5,7 @@
 
 import operator
 import json
+import numpy as np
 from sklearn.feature_extraction.text import *
 
 
@@ -75,6 +76,9 @@ def get_document_term_matrix(data):
 ################################################################################
 # Nearest Prototype Classifier
 ################################################################################
+''' evaluate nearest centroid classifier
+    returns accuracy of classifier
+'''
 def nc_eval(tl, dd, dl, v):
     centroids = get_centroids(tl,v)
     labels = []
@@ -84,14 +88,20 @@ def nc_eval(tl, dd, dl, v):
 
     return accuracy(labels, dl)
 
+
+''' nearest prototype classifier
+    returns the language classification of instance
+'''
 def nearest_prototype(centroids, instance):
     dists = dict((key, 0) for key in langs)
     for centroid in centroids:
-        dists[centroid] = dist_euclid(instance.toarray()[0], centroids[centroid])
-
+        # dists[centroid] = dist_euclid(instance.toarray()[0], centroids[centroid])
+        dists[centroid] = euclid_dist(instance.toarray()[0], centroids[centroid])
     return sorted(dists.items(), key=operator.itemgetter(1))[0][0]
 
 
+""" get centroids from 
+"""
 def get_centroids(tl, v):
     centroids = dict((key, 0) for key in langs)
     count = dict((key, 0) for key in langs)
@@ -104,14 +114,8 @@ def get_centroids(tl, v):
     return centroids
 
 
-''' calculate euclidean distance between two feature vectors
-'''
-def dist_euclid(v1, v2):
-    sum = 0
-    for attr1, attr2 in zip(v1, v2):
-        sum += (attr1 - attr2) ** 2
-    return sum ** 1 / 2
-
+def euclid_dist(a, b):
+    return np.linalg.norm(a-b)
 
 
 ################################################################################
@@ -150,6 +154,8 @@ if __name__ == "__main__":
     dev_data = read_json('in/dev.json')
     dev_labels = [instance["lang"] for instance in dev_data]
 
+    test_data = read_json('in/test.json')
+
     V = get_document_term_matrix(training_data)
 
-    nc_eval(training_labels, dev_data, dev_labels, V)
+    print(nc_eval(training_labels, dev_data, dev_labels, V))
