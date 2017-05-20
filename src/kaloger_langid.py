@@ -5,9 +5,11 @@
 
 # some basic libraries for parsing etc
 from json import loads
+from random import randint
 import math
 import numpy as np
 import itertools
+from sklearn.preprocessing import LabelBinarizer
 
 # vectorisors for document-term matrices
 from sklearn.feature_extraction.text import HashingVectorizer
@@ -25,6 +27,12 @@ from sklearn.ensemble import AdaBoostClassifier
 
 # tensorflow for deep learning
 import tensorflow as tf
+from keras.models import Sequential
+from keras.layers import Dense, Activation
+from keras.optimizers import SGD
+from keras.losses import categorical_crossentropy
+from keras.utils.np_utils import to_categorical
+
 
 
 ###############################################################################
@@ -43,8 +51,12 @@ def read_json(filename):
     labels = []
     for line in open(filename):
         line_data = loads(line)
+        if(line_data["lang"] == "unk"):
+            continue
         data_set.append(line_data["text"])
         labels.append(line_data["lang"])
+        if randint(1, 4) == 4:
+            continue
     return [data_set, labels]
 
 
@@ -53,9 +65,11 @@ def get_langs(data):
 
 
 def lang_clean(data):
+    i=0
     for instance in data:
-        if instance["lang"] not in langs:
-            instance["lang"] = "unk"
+        if instance not in langs:
+            data[i] = "unk"
+        i += 1
     return data
 
 
@@ -147,8 +161,35 @@ def adaboost_eval(vect, dtm, training_data, test_data):
 
 
 ################################################################################
-# My Custom Classifiers (where the fun begins)
+# My Neural Net Classifier (where the fun begins)
 ################################################################################
+def nn_batch_generator(X_data, y_data, batch_size):
+    samples_per_epoch = X_data.shape[0]
+    number_of_batches = samples_per_epoch/batch_size
+    counter = 0
+    index = np.arange(np.shape(y_data)[0])
+    while 1:
+        index_batch = index[batch_size*counter:batch_size*(counter+1)]
+        X_batch = X_data[index_batch,:].todense()
+        y_batch = y_data[index_batch]
+        counter += 1
+        yield np.array(X_batch),y_batch
+        if (counter > number_of_batches):
+            counter = 0
+
+def test_gen(X_data, batch_size):
+    samples_per_epoch = X_data.shape[0]
+    number_of_batches = samples_per_epoch/batch_size
+    counter = 0
+    index = np.arange(np.shape(X_data)[0])
+    while 1:
+        index_batch = index[batch_size*counter:batch_size*(counter+1)]
+        X_batch = X_data[index_batch,:].todense()
+        counter += 1
+        yield np.array(X_batch)
+        if (counter > number_of_batches):
+            counter = 0
+
 ################################################################################
 # Evaluation functions
 ################################################################################
@@ -242,12 +283,18 @@ if __name__ == "__main__":
     # training data
     training_data = read_json('in/train.json')
     print("training data parsed")
+    print(len(training_data[0]))
+    training_data[1] = lang_clean(training_data[1])
     # dev data
     dev_data = read_json('in/dev.json')
     print("dev data parsed")
 
+    V = get_vectorizer(training_data, "word", (1,1))
+
+
+
     # document term matrix
-    analyzers = ["word", "char", "char_wb"]
+    '''analyzers = ["word", "char", "char_wb"]
     ngrams = [(1,1), (1,2), (2,2)]
 
     for a in analyzers:
@@ -266,4 +313,29 @@ if __name__ == "__main__":
             print(linsvm_eval(vect, dtm, training_data, dev_data))
             print(dectree_eval(vect, dtm, training_data, dev_data))
             print(voting_eval(vect, dtm, training_data, dev_data))
-            print(adaboost_eval(vect, dtm, training_data, dev_data))
+            print(adaboost_eval(vect, dtm, training_data, dev_data))'''
+
+    encoder = LabelBinarizer()
+    training_data[1] = encoder.fit_transform(training_data[1])
+    dev_data[1] = encoder.fit_transform(dev_data[1])
+
+    model = Sequential()
+    print(V[1].shape)
+    model.add(Dense(units=64, input_shape=V[1].shape[1:]))
+    model.add(Activation('relu'))
+    model.add(Dense(units=20))
+    model.add(Activation('softmax'))
+
+    model.compile(loss='categorical_crossentropy',
+                  optimizer='sgd',
+                  metrics=['accuracy'])
+
+    model.compile(loss=categorical_crossentropy,
+                  optimizer=SGD(lr=0.01, momentum=0.9, nesterov=True))
+
+    # model.fit(V[1].toarray(), training_data[1], batch_size=32, epochs=10)
+    model.fit_generator(nn_batch_generator(V[1], training_data[1], 32), steps_per_epoch=32, epochs=3)
+
+    classes = model.predict_generator(test_gen(get_feature_vector(dev_data, V[0]), 32), 188)
+
+    print(classes)
