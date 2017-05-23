@@ -1,18 +1,28 @@
 """ Short Text Language Identification
     Jack Kaloger 2017
     Project 1 for COMP30027
+    
+    Thanks for another fun project! I learned a lot in this one.
+    My submission classifiers are the SVM, Random Forest and Neural Network
+    They can be found after line 292 of this file :)
 """
 
 # some basic libraries for parsing etc
 from json import loads
-from random import randint
-import math
 import numpy as np
-import itertools
 from sklearn.preprocessing import LabelBinarizer
+
+# visualisation
+# import matplotlib.pyplot as plt
+# from sklearn.decomposition import PCA
 
 # vectorisors for document-term matrices
 from sklearn.feature_extraction.text import HashingVectorizer
+from sklearn.feature_selection import SelectKBest
+from sklearn.feature_selection import chi2
+
+# tf-idf
+from sklearn.feature_extraction.text import TfidfTransformer
 
 # some basic classifiers
 from sklearn.neighbors.nearest_centroid import NearestCentroid
@@ -20,18 +30,20 @@ from sklearn.naive_bayes import MultinomialNB
 from sklearn.svm import LinearSVC
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import SGDClassifier
+from sklearn.linear_model import LogisticRegression
 
 # some ensemble learners
 from sklearn.ensemble import VotingClassifier
+from sklearn.ensemble import BaggingClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import AdaBoostClassifier
 
-# tensorflow for deep learning
+# deep learning stuff
 import tensorflow as tf
 from keras.models import Sequential
-from keras.layers import Dense, Activation
-from keras.optimizers import SGD
-from keras.losses import categorical_crossentropy
-from keras.utils.np_utils import to_categorical
+from keras.layers import Dense, Dropout
+from sklearn.utils import compute_class_weight
 
 
 
@@ -42,35 +54,79 @@ langs = ["ar", "bg", "de", "en", "es", "fa", "fr",
          "he", "hi", "it", "ja", "ko", "mr", "ne",
          "nl", "ru", "th", "uk", "ur", "zh", "unk"]
 
+encoder = LabelBinarizer()
+encoder.fit(langs)
+
+sources = ["JRC-Acquis", "Debian", "Wikipedia", "twitter"]
+
+stops = [".", "。", "।"]
+
+K = 1000
+
+THRESHOLD = 0.33
+
 
 ################################################################################
 # Functions for data set processing
 ################################################################################
 def read_json(filename):
-    data_set = []
-    labels = []
+    lines = []
     for line in open(filename):
         line_data = loads(line)
-        if(line_data["lang"] == "unk"):
-            continue
-        data_set.append(line_data["text"])
-        labels.append(line_data["lang"])
-        if randint(1, 4) == 4:
-            continue
-    return [data_set, labels]
+        lines.append(line_data)
+    return lines
 
 
 def get_langs(data):
     return [x["lang"] for x in data]
 
 
-def lang_clean(data):
-    i=0
+def get_text(data):
+    return [x["text"] for x in data]
+
+
+def get_ids(data):
+    return [x["id"] for x in data]
+
+
+def lang_clean(data_set):
+    for instance in data_set:
+        if instance["lang"] not in langs:
+            instance["lang"] = "unk"
+    return data_set
+
+
+def text2sentence(data_set):
+    new = []
+    for instance in data_set:
+        sentences = instance["text"].split(".")
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if sentence != "":
+                new.append({
+                    "lang": instance["lang"],
+                    "src": instance["src"],
+                    "text": sentence
+                })
+    return new
+
+
+def src_only(data, src):
+    out = []
     for instance in data:
-        if instance not in langs:
-            data[i] = "unk"
-        i += 1
-    return data
+        if instance["src"] == src:
+            out.append(instance)
+
+    return out
+
+
+def src_except(data, src):
+    out = []
+    for instance in data:
+        if instance["src"] != src:
+            out.append(instance)
+
+    return out
 
 
 def tweet_clean(data):
@@ -81,12 +137,12 @@ def tweet_clean(data):
 
 
 def get_feature_vector(test_data, vect):
-    return vect.transform(test_data[0])
+    return tf.transform(ptile.transform(vect.transform(test_data[0])))
 
 
 def get_vectorizer(data_set, an, nr):
     v = HashingVectorizer(non_negative=True, analyzer=an, lowercase=False, ngram_range=nr)
-    data_set_text = data_set[0]
+    data_set_text = get_text(data_set)
     dtm = v.fit_transform(data_set_text)
     return [v, dtm]
 
@@ -110,21 +166,6 @@ def nb_eval(vect, dtm, training_data, test_data):
     return stat_eval(labels, test_data[1])
 
 
-def svm_eval(vect, dtm, training_data, test_data):
-    clf = SVC()
-    clf.fit(dtm, training_data[1])
-    labels = clf.predict(get_feature_vector(test_data, vect))
-
-    return stat_eval(labels, test_data[1])
-
-def linsvm_eval(vect, dtm, training_data, test_data):
-    clf = LinearSVC()
-    clf.fit(dtm, training_data[1])
-    labels = clf.predict(get_feature_vector(test_data, vect))
-
-    return stat_eval(labels, test_data[1])
-
-
 def dectree_eval(vect, dtm, training_data, test_data):
     clf = DecisionTreeClassifier()
     clf.fit(dtm, training_data[1])
@@ -134,26 +175,106 @@ def dectree_eval(vect, dtm, training_data, test_data):
 
 
 ################################################################################
+# SVM Classifiers
+################################################################################
+def svm_eval(vect, dtm, training_data, test_data):
+    clf = SVC()
+    clf.fit(dtm, training_data[1])
+    labels = clf.predict(get_feature_vector(test_data, vect))
+
+    return stat_eval(labels, test_data[1])
+
+
+def linsvm_eval(vect, dtm, training_data, test_data):
+    clf = SVC()
+    clf.fit(dtm, training_data[1])
+    labels = clf.predict(get_feature_vector(test_data, vect))
+
+    return stat_eval(labels, test_data[1])
+
+
+def thresholded_linsvm_eval(vect, dtm, training_data, test_data):
+    clf = SVC(kernel='linear', probability=True)
+    clf.fit(dtm, training_data[1])
+    probs = clf.predict_proba(get_feature_vector(test_data, vect))
+    labels = []
+    for sample in probs:
+        unknown = True
+        i = 0
+        for prob in sample:
+            if prob > THRESHOLD:
+                unknown = False
+                labels.append(clf.classes_[i])
+                break
+            i += 1
+        if unknown:
+            labels.append("unk")
+    return accuracy(labels, test_data[1])
+
+
+################################################################################
+# SGD classifier
+################################################################################
+def sgd_eval(vect, dtm, training_data, test_data):
+    sgd = SGDClassifier(loss="hinge", penalty="elasticnet")
+    sgd.fit(dtm, training_data[1])
+    labels = sgd.predict(get_feature_vector(test_data, vect))
+
+    return stat_eval(labels, test_data[1])
+
+
+################################################################################
 # Ensemble Classifiers
 ################################################################################
 def voting_eval(vect, dtm, training_data, test_data):
-    svm = LinearSVC()
-    nc = NearestCentroid()
-    dt = DecisionTreeClassifier()
+    logit = LogisticRegression(n_jobs=2)
     nb = MultinomialNB()
-    ens = VotingClassifier(estimators=[('svm', svm),
-                                       ('nc', nc),
-                                       ('dt', dt),
+    ens = VotingClassifier(estimators=[('logit', logit),
                                        ('nb', nb)],
-                           voting='hard')
+                           voting='soft')
     ens.fit(dtm, training_data[1])
     labels = ens.predict(get_feature_vector(test_data, vect))
 
+    return stat_eval(labels, test_data[1])
+
+
+def bagging_eval(vect, dtm, training_data, test_data):
+    ens = BaggingClassifier(n_estimators=500)
+    ens.fit(dtm, training_data[1])
+    labels = ens.predict(get_feature_vector(test_data, vect))
+
+    return stat_eval(labels, test_data[1])
+
+
+def rforest_eval(vect, dtm, training_data, test_data):
+    ens = RandomForestClassifier(n_estimators=500)
+    ens.fit(dtm, training_data[1])
+    labels = ens.predict(get_feature_vector(test_data, vect))
+
+    return stat_eval(labels, test_data[1])
+
+
+def thresholded_rforest_eval(vect, dtm, training_data, test_data):
+    ens = RandomForestClassifier(n_estimators=10)
+    ens.fit(dtm, training_data[1])
+    probs = ens.predict_proba(get_feature_vector(test_data, vect))
+    labels = []
+    for sample in probs:
+        unknown = True
+        i=0
+        for prob in sample:
+            if prob > THRESHOLD:
+                unknown = False
+                labels.append(ens.classes_[i])
+                break
+            i += 1
+        if unknown:
+            labels.append("unk")
     return stat_eval(labels, test_data[1])
 
 
 def adaboost_eval(vect, dtm, training_data, test_data):
-    ens = AdaBoostClassifier(n_estimators=50)
+    ens = AdaBoostClassifier(n_estimators=500)
     ens.fit(dtm, training_data[1])
     labels = ens.predict(get_feature_vector(test_data, vect))
 
@@ -161,9 +282,66 @@ def adaboost_eval(vect, dtm, training_data, test_data):
 
 
 ################################################################################
-# My Neural Net Classifier (where the fun begins)
+# SUBMISSION CLASSIFIERS
 ################################################################################
-def nn_batch_generator(X_data, y_data, batch_size):
+################################################################################
+# Linear SVM with thresholding for unknown class
+################################################################################
+def thresholded_linsvm_predict(vect, dtm, training_data, test_data):
+    clf = SVC(kernel='linear', probability=True)
+    clf.fit(dtm, training_data[1])
+    probs = clf.predict_proba(get_feature_vector(test_data, vect))
+    labels = []
+    for sample in probs:
+        unknown = True
+        i = 0
+        for prob in sample:
+            if prob > THRESHOLD:
+                unknown = False
+                labels.append(clf.classes_[i])
+                break
+            i += 1
+        if unknown:
+            labels.append("unk")
+
+    out = []
+    for id, label in zip(test_data[1], labels):
+        out.append((id, label))
+
+    return out
+
+
+################################################################################
+# Random Forests with thresholding for unknown class
+################################################################################
+def thresholded_rforest_predict(vect, dtm, training_data, test_data):
+    ens = RandomForestClassifier(n_estimators=50)
+    ens.fit(dtm, training_data[1])
+    probs = ens.predict_proba(get_feature_vector(test_data, vect))
+    labels = []
+    for sample in probs:
+        unknown = True
+        i = 0
+        for prob in sample:
+            if prob > THRESHOLD:
+                unknown = False
+                labels.append(ens.classes_[i])
+                break
+            i += 1
+        if unknown:
+            labels.append("unk")
+
+    out = []
+    for id, label in zip(test_data[1], labels):
+        out.append((id, label))
+
+    return out
+
+
+################################################################################
+# My Neural Net Classifier (with thresholding)
+################################################################################
+def train_gen(X_data, y_data, batch_size):
     samples_per_epoch = X_data.shape[0]
     number_of_batches = samples_per_epoch/batch_size
     counter = 0
@@ -177,6 +355,7 @@ def nn_batch_generator(X_data, y_data, batch_size):
         if (counter > number_of_batches):
             counter = 0
 
+
 def test_gen(X_data, batch_size):
     samples_per_epoch = X_data.shape[0]
     number_of_batches = samples_per_epoch/batch_size
@@ -189,6 +368,44 @@ def test_gen(X_data, batch_size):
         yield np.array(X_batch)
         if (counter > number_of_batches):
             counter = 0
+
+
+def neural_eval(vect, dtm, training_data, test_data):
+    test_data[1] = encoder.fit_transform(test_data[1])
+    training_data[1] = encoder.fit_transform(training_data[1])
+
+    model = Sequential()
+    model.add(Dense(units=160, kernel_initializer="glorot_uniform", input_shape=dtm.shape[1:], activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(units=80, kernel_initializer="glorot_uniform", activation='hard_sigmoid'))
+    model.add(Dropout(0.5))
+    model.add(Dense(units=40, kernel_initializer="glorot_uniform", activation='hard_sigmoid'))
+    model.add(Dropout(0.5))
+    model.add(Dense(units=len(langs), kernel_initializer="glorot_uniform", activation='softmax'))
+
+    model.compile(loss='mean_squared_error',
+                  optimizer='Adam',
+                  metrics=['acc'])
+
+    weights = compute_class_weight(class_weight='balanced', classes=encoder.transform(langs), y=training_data[1])
+    weights[encoder.transform(["unk"])] *= 100
+
+    model.fit_generator(train_gen(dtm, training_data[1], 4),
+                        steps_per_epoch=len(training_data[1]) / 4,
+                        epochs=3,
+                        class_weight=weights)
+
+    classes = model.predict_generator(test_gen(get_feature_vector(test_data, vect), 16), len(test_data[1]) / 16)
+    '''classes = model.predict_proba(get_feature_vector(test_data, vect).toarray())
+    labels = []
+    for sample in classes:
+        p = sample.argmax(axis=-1)
+        if p > THRESHOLD:
+                labels.append(p)
+        else:
+            labels.append(encoder.transform("unk"))'''
+    return stat_eval(encoder.inverse_transform(classes), encoder.inverse_transform(test_data[1]))
+
 
 ################################################################################
 # Evaluation functions
@@ -273,6 +490,8 @@ def macro_recall(predicted, real):
 
 
 def f_score(B, precision, recall):
+    if ((B*B*precision) + recall) <= 0:
+        return 0
     return (1 + B*B) * ((precision * recall) / ((B*B*precision) + recall))
 
 
@@ -280,62 +499,47 @@ def f_score(B, precision, recall):
 # MAIN
 ################################################################################
 if __name__ == "__main__":
-    # training data
-    training_data = read_json('in/train.json')
-    print("training data parsed")
-    print(len(training_data[0]))
-    training_data[1] = lang_clean(training_data[1])
-    # dev data
+    # load development data
     dev_data = read_json('in/dev.json')
-    print("dev data parsed")
 
-    V = get_vectorizer(training_data, "word", (1,1))
+    training_data = read_json('in/train.json')
+    training_data = src_except(training_data, "JRC-Acquis")
+    #training_data = src_only(training_data, "twitter")
+    training_data = lang_clean(training_data)
+    training_data.append({"lang": "unk",
+                          "src": "internal",
+                          "text": "  "})
+
+    print("getting doc-term matrix...")
+    # get document term matrix
+    V = get_vectorizer(training_data, "char_wb", (1, 2))
+
+    print("selecting features...")
+    # apply feature selection
+    ptile = SelectKBest(score_func=chi2, k=K)
+    dtm_new = ptile.fit_transform(V[1], get_langs(training_data))
+
+    print("applying tf-idf...")
+    # apply tf-idf
+    tf = TfidfTransformer()
+    dtm_new = tf.fit_transform(dtm_new)
 
 
+    '''print(neural_eval(V[0], dtm_new, [get_text(training_data), get_langs(training_data)],
+                       [get_text(dev_data), get_langs(dev_data)]))'''
 
-    # document term matrix
-    '''analyzers = ["word", "char", "char_wb"]
-    ngrams = [(1,1), (1,2), (2,2)]
+    for i in range(5,95,5):
+        THRESHOLD = i/100
+        print("evaluating... %d" % i)
 
-    for a in analyzers:
-        for n in ngrams:
-            print(a)
-            print(n)
-            V = get_vectorizer(training_data, a, n)
+        print(thresholded_linsvm_eval(V[0], dtm_new, [get_text(training_data), get_langs(training_data)],
+                                      [get_text(dev_data), get_langs(dev_data)]))
 
-            vect = V[0]
-            dtm = V[1]
-            print("dtm parsed")
+    '''predictions = thresholded_rforest_predict(V[0], dtm_new, [get_text(training_data), get_langs(training_data)],
+                       [get_text(test_data), get_ids(test_data)])
 
-            print("Naïve Bayes, Nearest Centroid, LSVM, Decision Trees, Voting Ensemble, Adaboost Ensemble")
-            print(nb_eval(vect, dtm, training_data, dev_data))
-            print(nc_eval(vect, dtm, training_data, dev_data))
-            print(linsvm_eval(vect, dtm, training_data, dev_data))
-            print(dectree_eval(vect, dtm, training_data, dev_data))
-            print(voting_eval(vect, dtm, training_data, dev_data))
-            print(adaboost_eval(vect, dtm, training_data, dev_data))'''
-
-    encoder = LabelBinarizer()
-    training_data[1] = encoder.fit_transform(training_data[1])
-    dev_data[1] = encoder.fit_transform(dev_data[1])
-
-    model = Sequential()
-    print(V[1].shape)
-    model.add(Dense(units=64, input_shape=V[1].shape[1:]))
-    model.add(Activation('relu'))
-    model.add(Dense(units=20))
-    model.add(Activation('softmax'))
-
-    model.compile(loss='categorical_crossentropy',
-                  optimizer='sgd',
-                  metrics=['accuracy'])
-
-    model.compile(loss=categorical_crossentropy,
-                  optimizer=SGD(lr=0.01, momentum=0.9, nesterov=True))
-
-    # model.fit(V[1].toarray(), training_data[1], batch_size=32, epochs=10)
-    model.fit_generator(nn_batch_generator(V[1], training_data[1], 32), steps_per_epoch=32, epochs=3)
-
-    classes = model.predict_generator(test_gen(get_feature_vector(dev_data, V[0]), 32), 188)
-
-    print(classes)
+    f = open('../out/dtree', 'w')
+    f.write("id,prediction\n")
+    for pred in predictions:
+        f.write("%s,%s\n" % (pred[0], pred[1]))
+    f.close()'''
