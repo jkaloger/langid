@@ -63,7 +63,7 @@ stops = [".", "。", "।"]
 
 K = 1000
 
-THRESHOLD = 0.33
+THRESHOLD = 0.73
 
 
 ################################################################################
@@ -209,7 +209,7 @@ def thresholded_linsvm_eval(vect, dtm, training_data, test_data):
             i += 1
         if unknown:
             labels.append("unk")
-    return accuracy(labels, test_data[1])
+    return stat_eval(labels, test_data[1])
 
 
 ################################################################################
@@ -341,38 +341,29 @@ def thresholded_rforest_predict(vect, dtm, training_data, test_data):
 ################################################################################
 # My Neural Net Classifier (with thresholding)
 ################################################################################
-def train_gen(X_data, y_data, batch_size):
-    samples_per_epoch = X_data.shape[0]
-    number_of_batches = samples_per_epoch/batch_size
-    counter = 0
-    index = np.arange(np.shape(y_data)[0])
+''' training data generator for batch learning
+    based on code from 
+'''
+def train_gen(X, y, batch):
+    num_samples = X.shape[0]
+    num_batches = num_samples/batch
+    n = 0
+    i = np.arange(np.shape(y)[0])
     while 1:
-        index_batch = index[batch_size*counter:batch_size*(counter+1)]
-        X_batch = X_data[index_batch,:].todense()
-        y_batch = y_data[index_batch]
-        counter += 1
+        next_batch = i[batch*n:batch*(n+1)]
+        n+=1
+        X_batch = X[next_batch,:].todense()
+        y_batch = y[next_batch]
         yield np.array(X_batch),y_batch
-        if (counter > number_of_batches):
-            counter = 0
+        if n > num_batches:
+            n = 0
 
 
-def test_gen(X_data, batch_size):
-    samples_per_epoch = X_data.shape[0]
-    number_of_batches = samples_per_epoch/batch_size
-    counter = 0
-    index = np.arange(np.shape(X_data)[0])
-    while 1:
-        index_batch = index[batch_size*counter:batch_size*(counter+1)]
-        X_batch = X_data[index_batch,:].todense()
-        counter += 1
-        yield np.array(X_batch)
-        if (counter > number_of_batches):
-            counter = 0
-
-
-def neural_eval(vect, dtm, training_data, test_data):
-    test_data[1] = encoder.fit_transform(test_data[1])
-    training_data[1] = encoder.fit_transform(training_data[1])
+def neural_predict(vect, dtm, training_data, test_data):
+    weights = compute_class_weight(class_weight=None, classes=np.array(langs), y=training_data[1])
+    weights[20] *= 100
+    encoded = encoder.fit_transform(langs)
+    training_data[1] = encoder.transform(training_data[1])
 
     model = Sequential()
     model.add(Dense(units=160, kernel_initializer="glorot_uniform", input_shape=dtm.shape[1:], activation='relu'))
@@ -387,24 +378,17 @@ def neural_eval(vect, dtm, training_data, test_data):
                   optimizer='Adam',
                   metrics=['acc'])
 
-    weights = compute_class_weight(class_weight='balanced', classes=encoder.transform(langs), y=training_data[1])
-    weights[encoder.transform(["unk"])] *= 100
-
     model.fit_generator(train_gen(dtm, training_data[1], 4),
                         steps_per_epoch=len(training_data[1]) / 4,
-                        epochs=3,
+                        epochs=4,
                         class_weight=weights)
 
-    classes = model.predict_generator(test_gen(get_feature_vector(test_data, vect), 16), len(test_data[1]) / 16)
-    '''classes = model.predict_proba(get_feature_vector(test_data, vect).toarray())
-    labels = []
-    for sample in classes:
-        p = sample.argmax(axis=-1)
-        if p > THRESHOLD:
-                labels.append(p)
-        else:
-            labels.append(encoder.transform("unk"))'''
-    return stat_eval(encoder.inverse_transform(classes), encoder.inverse_transform(test_data[1]))
+    classes = model.predict(get_feature_vector(test_data, vect).toarray())
+    out = []
+    for id, label in zip(test_data[1], encoder.inverse_transform(classes)):
+        out.append((id, label))
+
+    return out
 
 
 ################################################################################
@@ -501,10 +485,10 @@ def f_score(B, precision, recall):
 if __name__ == "__main__":
     # load development data
     dev_data = read_json('in/dev.json')
+    test_data = read_json('in/test.json')
 
     training_data = read_json('in/train.json')
-    training_data = src_except(training_data, "JRC-Acquis")
-    #training_data = src_only(training_data, "twitter")
+    training_data = src_only(training_data, "twitter")
     training_data = lang_clean(training_data)
     training_data.append({"lang": "unk",
                           "src": "internal",
@@ -524,22 +508,12 @@ if __name__ == "__main__":
     tf = TfidfTransformer()
     dtm_new = tf.fit_transform(dtm_new)
 
-
-    '''print(neural_eval(V[0], dtm_new, [get_text(training_data), get_langs(training_data)],
-                       [get_text(dev_data), get_langs(dev_data)]))'''
-
-    for i in range(5,95,5):
-        THRESHOLD = i/100
-        print("evaluating... %d" % i)
-
-        print(thresholded_linsvm_eval(V[0], dtm_new, [get_text(training_data), get_langs(training_data)],
-                                      [get_text(dev_data), get_langs(dev_data)]))
-
-    '''predictions = thresholded_rforest_predict(V[0], dtm_new, [get_text(training_data), get_langs(training_data)],
+    print("Neural Net")
+    predictions = neural_predict(V[0], dtm_new, [get_text(training_data), get_langs(training_data)],
                        [get_text(test_data), get_ids(test_data)])
 
-    f = open('../out/dtree', 'w')
-    f.write("id,prediction\n")
+    f = open('../out/neuralNet.csv', 'w')
+    f.write("docid,lang\n")
     for pred in predictions:
         f.write("%s,%s\n" % (pred[0], pred[1]))
-    f.close()'''
+    f.close()
