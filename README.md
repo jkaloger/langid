@@ -70,7 +70,7 @@ Thus far, only a nearest centroid classifier has been used in testing. In this s
 Briefly, Support Vector Machines define a hyperplane along which the dataset is separated. They attempt to maximize the margin between the hyperplane and the closest data points. Figure 6 shows three weak, baseline classifiers trained on all datasets except JRC-Acquis: Nearest Centroid, Multinomial Naïve Bayes, Decision Tree; compared to two stronger SVMs: A Linear Support Vector Machine (SVM) and a gradient descent L-SVM.
 Classifier
 
-Method | Acc | Macro-Precision | Macro-Recall | F1-Score
+| Method | Acc | Macro-Precision | Macro-Recall | F1-Score |
 |---------|---------|---------|---------|---------|
 | NC | 0.7215 | 0.7513 | 0.8361 | 0.7914 |
 | MNB | 0.6922 | 0.8369 | 0.7984 | 0.8172 |
