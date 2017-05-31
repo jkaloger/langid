@@ -19,7 +19,7 @@ The mentioned approaches are equivalent to a unigram approach, where each featur
 One of the main issues with twitter language identification is the number of differences it holds with longer-text publications such as books. Some of these differences include sentence structure, use of internet slang or shortened words as well as length of documents. Training data provided came from 4 sources: JRC-Acquis, Debian documentation, Wikipedia and Twitter. To demonstrate the differences, figure 1 shows a comparison between the Nearest Centroid baseline with character unigrams and bigrams trained on each of the datasets alone, as well as combined. Here, LM represents the length of the document in characters.
 
 | Document | Document Length | Acc | Macro-Precision | Macro-Recall | F1-Score |
-|---|---|---|---|---|---|
+|---------|---------|---------|---------|---------|
 | JRC-Acquis | 16618 | 0.3566 | 0.1480 | 0.2563 | 0.1876 |
 | Debian | 10310 | 0.5920 | 0.6497 | 0.6518 | 0.6507 |
 | Wikipedia | 7175 | 0.6086 | 0.6219 | 0.6936 | 0.6558 |
@@ -31,7 +31,7 @@ One of the main issues with twitter language identification is the number of dif
 Clearly, the longer the document, the less similar it is to twitter data. I tried a few experiments to remedy this. Among them included splitting instances into sentences and lines, and Tf-idf transformation. Figure 2 shows the results of two experiments over the JRC-Acquis dataset; once again using the baseline nearest centroid classifier with character unigrams and bigrams.
 
 | Method | Acc | Macro-Precision | Macro-Recall | F1-Score |
-|---|---|---|---|---|
+|---------|---------|---------|---------|---------|
 | Sentences | -0.05 | 0.068 | -0.03 | 0.03 |
 | Tf-idf | 0.02 | 0.00 | 0.02 | 0.01 |
 
@@ -52,7 +52,7 @@ Accuracy increases drastically as we increase the number of features until 200-3
 Using dataset cleaning, feature selection and normalization techniques to improve the use of larger datasets, I return to a comparison between dataset training using the Nearest Centroid classifier. Figure 5 refers to training on the different datasets with a Nearest Centroid Classifier using character unigrams and bigrams with a χ2 selection function and languages cleaned from the datasets. It presents the change from the original data in figure 1:
 
 | Document | Acc | Macro-Precision | Macro-Recall | F1-Score |
-|---|---|---|---|---|
+|---------|---------|---------|---------|---------|
 | JRC-Acquis | 0.0290 | 0.0099 | 0.0209 | 0.0136 |
 | Debian | 0.0582 | 0.0634 | 0.0954 | 0.0791 |
 | Wikipedia | 0.0386 | 0.0564 | 0.0584 | 0.0574 |
@@ -71,7 +71,7 @@ Briefly, Support Vector Machines define a hyperplane along which the dataset is 
 Classifier
 
 Method | Acc | Macro-Precision | Macro-Recall | F1-Score
-|---|---|---|---|---|
+|---------|---------|---------|---------|---------|
 | NC | 0.7215 | 0.7513 | 0.8361 | 0.7914 |
 | MNB | 0.6922 | 0.8369 | 0.7984 | 0.8172 |
 | DT | 0.6784 | 0.6983 | 0.7837 | 0.7386 |
@@ -91,7 +91,7 @@ Voting classifiers involve running base classifiers over all data and selecting 
 Classifier
 
 Method | Acc | Macro-Precision | Macro-Recall | F1-Score
-|---|---|---|---|---|
+|---------|---------|---------|---------|---------|
 | L-SVM | 0 | 0 | 0 | 0 |
 | Voting | -0.0152 | 0.0066 | -0.0206 | -0.0060 |
 | Bagging | -0.0413 | -0.0381 | -0.0460 | -0.0418 |
@@ -117,7 +117,7 @@ Both the classifiers receive a boost in accuracy. In the development set, around
 Deep learning models require large amounts of training data. As such, the neural network presented is not as accurate as it could be. In order to account for the unknown class, I hypothesised increasing the class weight of ‘unk’ would simulate thresholding. Figure 9 shows the results from a neural network classifier.
 
 Method | Acc | Macro-Precision | Macro-Recall | F1-Score
-|---|---|---|---|---|
+|---------|---------|---------|---------|---------|
 | NN | 0.7727 | 0.8060 | 0.8663 | 0.8350 |
 
 #### Figure 9: Neural network evaluation.
