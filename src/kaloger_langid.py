@@ -1,10 +1,5 @@
 """ Short Text Language Identification
     Jack Kaloger 2017
-    Project 1 for COMP30027
-    
-    Thanks for another fun project! I learned a lot in this one.
-    My submission classifiers are the SVM, Random Forest and Neural Network
-    They can be found after line 292 of this file :)
 """
 
 # some basic libraries for parsing etc
