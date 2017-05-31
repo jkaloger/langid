@@ -18,21 +18,23 @@ The mentioned approaches are equivalent to a unigram approach, where each featur
 ### 2.2	Datasets
 One of the main issues with twitter language identification is the number of differences it holds with longer-text publications such as books. Some of these differences include sentence structure, use of internet slang or shortened words as well as length of documents. Training data provided came from 4 sources: JRC-Acquis, Debian documentation, Wikipedia and Twitter. To demonstrate the differences, figure 1 shows a comparison between the Nearest Centroid baseline with character unigrams and bigrams trained on each of the datasets alone, as well as combined. Here, LM represents the length of the document in characters.
 
-Document | Document Length | Acc | Macro-Precision | Macro-Recall | F1-Score
+| Document | Document Length | Acc | Macro-Precision | Macro-Recall | F1-Score |
 |---|---|---|---|---|---|
 | JRC-Acquis | 16618 | 0.3566 | 0.1480 | 0.2563 | 0.1876 |
 | Debian | 10310 | 0.5920 | 0.6497 | 0.6518 | 0.6507 |
 | Wikipedia | 7175 | 0.6086 | 0.6219 | 0.6936 | 0.6558 |
 | Twitter | 77 | 0.6523 | 0.6845 | 0.7568 | 0.7189 |
 | ALL | 8545 | 0.6541 | 0.5875 | 0.7559 | 0.7201 |
+
 #### Figure 1: document evaluation.
 
 Clearly, the longer the document, the less similar it is to twitter data. I tried a few experiments to remedy this. Among them included splitting instances into sentences and lines, and Tf-idf transformation. Figure 2 shows the results of two experiments over the JRC-Acquis dataset; once again using the baseline nearest centroid classifier with character unigrams and bigrams.
 
-Method | Acc | Macro-Precision | Macro-Recall | F1-Score
+| Method | Acc | Macro-Precision | Macro-Recall | F1-Score |
 |---|---|---|---|---|
 | Sentences | -0.05 | 0.068 | -0.03 | 0.03 |
 | Tf-idf | 0.02 | 0.00 | 0.02 | 0.01 |
+
 #### Figure 2: Document cleaning evaluation.
 
 Unfortunately, none of these had a significant effect on the accuracy of classifiers. Most likely, this is due to the actual language and sentence structure of tweets being different to that of longer text documents, especially those from JRC-Acquis. Nonetheless, Tf-idf appears useful, and so should be applied to future experiments.
@@ -56,6 +58,7 @@ Using dataset cleaning, feature selection and normalization techniques to improv
 | Wikipedia | 0.0386 | 0.0564 | 0.0584 | 0.0574 |
 | Twitter | 0.0820 | 0.0702 | 0.0865 | 0.0776 |
 | ALL | 0.0290 | 0.0099 | 0.0209 | 0.0136 |
+
 #### Figure 5: Re-evaluation.
 
 While the methods outlined have improved the classifier, they do so for all training datasets in proportion to dataset size and thus are unlikely to be improving the use of long-text training data. As mentioned previously, this is likely due to the different structure of longer text documents. They are nonetheless useful inclusions for a short-text training data, as seen in the ~8% increase across all evaluation metrics for twitter data.
@@ -74,6 +77,7 @@ Method | Acc | Macro-Precision | Macro-Recall | F1-Score
 | DT | 0.6784 | 0.6983 | 0.7837 | 0.7386 |
 | Linear SVM | **0.7872** | **0.8174** | **0.8944** | **0.8542** |
 | SGD SVM | 0.7760 | 0.7895 | 0.8828 | 0.8336 |
+
 #### Figure 6: Baseline Classifiers.
 
 The Linear SVM proves to be the strongest classifier in every category. Linear SVMs define the hyperplane to be linear. In a sense, this is a form of regularization, since the complexity of the rules within the classifier are reduced – preventing overfitting. SVMs are also known to work well with sparse features – our dataset is very sparse. The use of SVMs is explored more in section 3.3 
@@ -93,6 +97,7 @@ Method | Acc | Macro-Precision | Macro-Recall | F1-Score
 | Bagging | -0.0413 | -0.0381 | -0.0460 | -0.0418 |
 | Random Forest | -0.0106 | -0.0064 | -0.0155 | -0.0106 |
 | AdaBoost | -0.4351 | -0.3415 | -0.4852 | -0.4142 |
+
 #### Figure 7: Ensemble learners.
 
 Ensemble learners are usually as good or nearly as good as strong learners. Their usefulness comes from their ability to combine weak classifiers into a stronger classifier. However, the SVM is a more accurate classifier. This is likely due to the regularization aspect mentioned earlier – moreover, there is a limit to how much ensemble learning can improve classifiers.
@@ -114,6 +119,7 @@ Deep learning models require large amounts of training data. As such, the neural
 Method | Acc | Macro-Precision | Macro-Recall | F1-Score
 |---|---|---|---|---|
 | NN | 0.7727 | 0.8060 | 0.8663 | 0.8350 |
+
 #### Figure 9: Neural network evaluation.
 
 Due to time constraints, I was unable to apply thresholding to the neural network. This most likely accounts for the lower accuracy.
