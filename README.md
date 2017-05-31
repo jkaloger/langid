@@ -66,7 +66,7 @@ While the methods outlined have improved the classifier, they do so for all trai
 ## 3	Classifiers
 Thus far, only a nearest centroid classifier has been used in testing. In this section, I provide an overview of 5 other classifiers and their usefulness.
 
-###3.1	SVM
+### 3.1	SVM
 Briefly, Support Vector Machines define a hyperplane along which the dataset is separated. They attempt to maximize the margin between the hyperplane and the closest data points. Figure 6 shows three weak, baseline classifiers trained on all datasets except JRC-Acquis: Nearest Centroid, Multinomial Naïve Bayes, Decision Tree; compared to two stronger SVMs: A Linear Support Vector Machine (SVM) and a gradient descent L-SVM.
 Classifier
 
