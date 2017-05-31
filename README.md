@@ -90,7 +90,7 @@ In the following tests, I demonstrate the usefulness of ensemble learning for sh
 Voting classifiers involve running base classifiers over all data and selecting the class most predicted for each instance (or using some other voting method) the classifiers used for voting are the five baseline classifiers from figure 6. Figure 7 compares these ensemble learners with the SVM classifier.
 Classifier
 
-Method | Acc | Macro-Precision | Macro-Recall | F1-Score
+| Method | Acc | Macro-Precision | Macro-Recall | F1-Score |
 |---------|---------|---------|---------|---------|
 | L-SVM | 0 | 0 | 0 | 0 |
 | Voting | -0.0152 | 0.0066 | -0.0206 | -0.0060 |
