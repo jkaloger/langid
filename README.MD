@@ -1,4 +1,5 @@
 # Language Identification of Short Text Documents
+Jack Kaloger 2017
 
 ## Abstract
 In this report, I outline a language classifier for twitter documents that uses long and short text documents as training. I ask whether long text data is useful for short text classification and apply a variety ensemble learners, deep learning and support vector machines to twitter language identification. Finally, I demonstrate the effectiveness of three selected classifiers using test data from twitter.
